@@ -7,7 +7,7 @@
     function calculateResult(event) {
       event.preventDefault();
       const answers = ['q1', 'q2', 'q3'].map(q => {
-        const selected = document.querySelector(`input[name="${q}"]:checked`);
+        const selected = document.querySelector(input[name="${q}"]:checked);
         return selected ? selected.value : null;
       });
 
@@ -338,11 +338,7 @@
     <p id="quiz-result"></p>
   </section>
 
-<br>
-<nav>
-  <a href="/counsellor/register" class="btn">Counsellor Register</a>
- 
-</nav>
+
 
 <br>
   <section class="faq">

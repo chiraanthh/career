@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, send_from_directory
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
-from models import Student, db, Notification, CareerGoal, GoalMilestone, Task, StudentDocument, Grievance, Event, EventRegistration, Message, Appointment, CounsellorSchedule, CareerCounselor
+from models import Student, db, Notification, CareerGoal, GoalMilestone, Task, StudentDocument, Grievance, Event, EventRegistration, Message, Appointment, CounsellorSchedule, CareerCounselor, AppointmentRequest
 from datetime import datetime, timedelta, time
 from sqlalchemy import desc, func
 from werkzeug.utils import secure_filename
@@ -184,6 +184,10 @@ def manage_goals():
         start_date_str = request.form.get('start_date')
         target_date_str = request.form.get('target_date')
         
+        if not title:
+            flash('Goal title is required', 'error')
+            return redirect(url_for('student.manage_goals'))
+        
         try:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else None
             target_date = datetime.strptime(target_date_str, '%Y-%m-%d').date() if target_date_str else None
@@ -199,14 +203,15 @@ def manage_goals():
             db.session.add(goal)
             db.session.commit()
             flash('Career goal added successfully!', 'success')
+            return redirect(url_for('student.dashboard'))
+            
         except Exception as e:
             db.session.rollback()
-            flash('Error adding career goal', 'danger')
-        
-        return redirect(url_for('student.manage_goals'))
+            flash('Error adding career goal: ' + str(e), 'error')
+            return redirect(url_for('student.manage_goals'))
     
-    goals = CareerGoal.query.filter_by(student_id=current_user.id).all()
-    return render_template('student/goals.html', goals=goals)
+    career_goals = CareerGoal.query.filter_by(student_id=current_user.id).all()
+    return render_template('student/dashboard.html', career_goals=career_goals)
 
 @student_bp.route('/goals/<int:goal_id>/milestones', methods=['GET', 'POST'])
 @login_required
@@ -626,22 +631,87 @@ def submit_grievance():
     
     return redirect(url_for('student.dashboard'))
 
+def setup_counselor_schedule(counselor_id):
+    """Set up default schedule for counselor if none exists"""
+    # Check if schedule exists
+    existing_schedule = CounsellorSchedule.query.filter_by(counsellor_id=counselor_id).first()
+    if existing_schedule:
+        return
+
+    # Extended working hours
+    start_time = time(9, 0)   # 9:00 AM
+    end_time = time(20, 0)    # 8:00 PM
+    
+    # Create schedule for Monday through Friday
+    weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+    for day in weekdays:
+        schedule = CounsellorSchedule(
+            counsellor_id=counselor_id,
+            day_of_week=day,
+            start_time=start_time,
+            end_time=end_time,
+            is_recurring=True
+        )
+        db.session.add(schedule)
+    
+    try:
+        db.session.commit()
+        print(f"Created default schedule for counselor {counselor_id}")
+    except Exception as e:
+        print(f"Error creating schedule: {str(e)}")
+        db.session.rollback()
+
+    # Delete existing schedule and create new one if needed
+    CounsellorSchedule.query.filter_by(counsellor_id=counselor_id).delete()
+    db.session.commit()
+
+    # Create new schedule
+    weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+    for day in weekdays:
+        schedule = CounsellorSchedule(
+            counsellor_id=counselor_id,
+            day_of_week=day,
+            start_time=start_time,
+            end_time=end_time,
+            is_recurring=True
+        )
+        db.session.add(schedule)
+    
+    try:
+        db.session.commit()
+        print(f"Updated schedule for counselor {counselor_id}")
+    except Exception as e:
+        print(f"Error updating schedule: {str(e)}")
+        db.session.rollback()
+
 @student_bp.route('/student/request_appointment', methods=['POST'])
 @login_required
 def request_appointment():
     # Get student ID from current_user
-    student_id = int(current_user.get_id().split('-')[1])
+    student_id = current_user.id
     counselor_id = current_user.counselor_id
+    
+    print("\n=== Debug: Processing Appointment Request ===")
+    print(f"Student ID: {student_id}")
+    print(f"Counselor ID: {counselor_id}")
     
     if not counselor_id:
         flash('You need to be assigned a counselor first.', 'danger')
         return redirect(url_for('student.dashboard'))
     
+    # Get form data
     appointment_type = request.form.get('appointment_type')
     appointment_date = request.form.get('appointment_date')
     start_time = request.form.get('start_time')
     mode = request.form.get('mode')
     notes = request.form.get('notes')
+    
+    print("\nForm Data Received:")
+    print(f"Type: {appointment_type}")
+    print(f"Date: {appointment_date}")
+    print(f"Time: {start_time}")
+    print(f"Mode: {mode}")
+    print(f"Notes: {notes}")
     
     # Validate required fields
     if not all([appointment_type, appointment_date, start_time, mode]):
@@ -650,90 +720,97 @@ def request_appointment():
     
     try:
         # Convert string inputs to proper datetime objects
-        appointment_date = datetime.strptime(appointment_date, '%Y-%m-%d').date()
-        start_time = datetime.strptime(start_time, '%H:%M').time()
+        preferred_date = datetime.strptime(appointment_date, '%Y-%m-%d').date()
+        preferred_time = datetime.strptime(start_time, '%H:%M').time()
+        
+        print("\nConverted Date/Time:")
+        print(f"Date: {preferred_date}")
+        print(f"Time: {preferred_time}")
         
         # Validate appointment date is not in the past
-        if appointment_date < datetime.now().date():
+        if preferred_date < datetime.now().date():
             flash('Cannot schedule appointments in the past', 'danger')
             return redirect(url_for('student.dashboard'))
         
-        # Calculate end time (1 hour duration)
-        end_time = (datetime.combine(datetime.min, start_time) + timedelta(hours=1)).time()
-        
-        # Check if counselor is available at this time
-        day_of_week = appointment_date.strftime('%A')
-        counselor_schedule = CounsellorSchedule.query.filter_by(
-            counsellor_id=counselor_id,
-            day_of_week=day_of_week
-        ).first()
-        
-        if not counselor_schedule:
-            flash('Counselor is not available on this day.', 'danger')
-            return redirect(url_for('student.dashboard'))
-        
-        if (start_time < counselor_schedule.start_time or 
-            end_time > counselor_schedule.end_time):
-            flash('Selected time is outside counselor\'s working hours.', 'danger')
-            return redirect(url_for('student.dashboard'))
-        
-        # Check for existing appointments at the same time
-        existing_appointment = Appointment.query.filter_by(
-            counselor_id=counselor_id,
-            appointment_date=appointment_date,
-            start_time=start_time
-        ).first()
-        
-        if existing_appointment:
-            flash('This time slot is already booked. Please choose another time.', 'danger')
-            return redirect(url_for('student.dashboard'))
-        
-        # Create new appointment
-        appointment = Appointment(
+        # Create appointment request
+        print("\nCreating appointment request...")
+        appointment_request = AppointmentRequest(
             student_id=student_id,
             counselor_id=counselor_id,
-            appointment_date=appointment_date,
-            start_time=start_time,
-            end_time=end_time,
-            status='scheduled',
+            appointment_type=appointment_type,
+            preferred_date=preferred_date,
+            preferred_time=preferred_time,
             mode=mode,
-            is_free=True  # You can modify this based on your business logic
+            notes=notes,
+            status='pending'
         )
         
-        if mode == 'online':
-            # Generate a unique meeting link
-            appointment.meeting_link = f"meet.counseling.com/{uuid.uuid4().hex}"
+        print("Adding to database...")
+        db.session.add(appointment_request)
+        db.session.commit()  # Commit first to get the ID
         
-        db.session.add(appointment)
-        
-        # Create notification for both student and counselor
-        student_notification = Notification(
-            user_id=student_id,
-            message=f'Your {appointment_type} appointment has been scheduled for {appointment_date.strftime("%B %d, %Y")} at {start_time.strftime("%I:%M %p")}',
-            notification_type='appointment',
-            related_entity_id=appointment.id
-        )
-        db.session.add(student_notification)
-        
-        # Create notification for counselor
+        print("Creating notifications...")
+        # For counselor
         counselor_notification = Notification(
             user_id=counselor_id,
-            message=f'New {appointment_type} appointment scheduled with {current_user.first_name} {current_user.last_name} for {appointment_date.strftime("%B %d, %Y")} at {start_time.strftime("%I:%M %p")}',
+            message=f'New appointment request from {current_user.first_name} {current_user.last_name} for {preferred_date.strftime("%B %d, %Y")} at {preferred_time.strftime("%I:%M %p")}',
             notification_type='appointment',
-            related_entity_id=appointment.id
+            related_entity_id=appointment_request.id,
+            created_at=datetime.now()  # Explicitly set the current time
         )
         db.session.add(counselor_notification)
         
+        # For student
+        student_notification = Notification(
+            user_id=student_id,
+            message=f'Your appointment request for {preferred_date.strftime("%B %d, %Y")} at {preferred_time.strftime("%I:%M %p")} has been submitted and is pending approval.',
+            notification_type='appointment',
+            related_entity_id=appointment_request.id,
+            created_at=datetime.now()  # Explicitly set the current time
+        )
+        db.session.add(student_notification)
+        
+        print("Committing notifications...")
         db.session.commit()
-        flash('Appointment scheduled successfully!', 'success')
+        print("Successfully committed to database!")
+        
+        flash('Appointment request submitted successfully! Waiting for counselor approval.', 'success')
         
     except ValueError as e:
+        print(f"ValueError: {str(e)}")
         flash('Invalid date or time format.', 'danger')
     except Exception as e:
+        print(f"Error: {str(e)}")
         db.session.rollback()
-        flash('Failed to schedule appointment. Please try again.', 'danger')
+        flash('Failed to submit appointment request. Please try again.', 'danger')
     
     return redirect(url_for('student.dashboard'))
+
+@student_bp.route('/student/appointment_requests', methods=['GET'])
+@login_required
+def view_appointment_requests():
+    print("=== Debug: Student Info ===")
+    print(f"Current user ID: {current_user.id}")
+    print(f"Current user type: {type(current_user.id)}")
+
+    appointment_requests = AppointmentRequest.query.filter_by(
+        student_id=current_user.id
+    ).order_by(AppointmentRequest.created_at.desc()).all()
+
+    print("=== Debug: Appointment Requests ===")
+    print(f"Number of requests found: {len(appointment_requests)}")
+    for req in appointment_requests:
+        print(f"Request ID: {req.id}")
+        print(f"Student ID: {req.student_id}")
+        print(f"Type: {req.appointment_type}")
+        print(f"Status: {req.status}")
+        print(f"Date: {req.preferred_date}")
+        print(f"Time: {req.preferred_time}")
+        print("---")
+
+    return jsonify({
+        'appointment_requests': [request.to_dict() for request in appointment_requests]
+    })
 
 @student_bp.route('/student/dashboard')
 @login_required
@@ -786,6 +863,31 @@ def dashboard():
         ).all()
         event_registrations = {r.event_id: r for r in registrations}
     
+    # Get student's appointment requests
+    print("=== Debug: Student Info ===")
+    print(f"Current user ID: {current_user.id}")
+    print(f"Current user type: {type(current_user.id)}")
+
+    appointment_requests = AppointmentRequest.query.filter_by(
+        student_id=current_user.id
+    ).order_by(AppointmentRequest.created_at.desc()).all()
+
+    print("=== Debug: Appointment Requests ===")
+    print(f"Number of requests found: {len(appointment_requests)}")
+    for req in appointment_requests:
+        print(f"Request ID: {req.id}")
+        print(f"Student ID: {req.student_id}")
+        print(f"Type: {req.appointment_type}")
+        print(f"Status: {req.status}")
+        print(f"Date: {req.preferred_date}")
+        print(f"Time: {req.preferred_time}")
+        print("---")
+
+    # Get student's counselor
+    counselor = None
+    if current_user.counselor_id:
+        counselor = CareerCounselor.query.get(current_user.counselor_id)
+
     return render_template('student/dashboard.html',
                          student=current_user,
                          unread_notifications=unread_notifications,
@@ -795,6 +897,8 @@ def dashboard():
                          upcoming_appointments=upcoming_appointments,
                          upcoming_events=upcoming_events,
                          event_registrations=event_registrations,
+                         appointment_requests=appointment_requests,
+                         counselor=counselor,
                          today=datetime.now())
 
 @student_bp.route('/student/notifications')
@@ -903,7 +1007,7 @@ def upload_document():
             student_id=current_user.id,
             title=request.form.get('title'),
             document_type=request.form.get('document_type'),
-            file_path=unique_filename,
+            file_path=file_path,
             file_type=get_file_type(file.filename)
         )
         
@@ -963,3 +1067,159 @@ def delete_document(doc_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
+
+@student_bp.route('/student/appointments/<int:appointment_id>/reschedule', methods=['GET', 'POST'])
+@login_required
+def reschedule_appointment(appointment_id):
+    appointment = Appointment.query.filter_by(
+        id=appointment_id,
+        student_id=current_user.id,
+        status='scheduled'
+    ).first_or_404()
+    
+    if request.method == 'POST':
+        new_date = request.form.get('appointment_date')
+        new_time = request.form.get('start_time')
+        
+        try:
+            # Convert string inputs to proper datetime objects
+            new_date = datetime.strptime(new_date, '%Y-%m-%d').date()
+            new_time = datetime.strptime(new_time, '%H:%M').time()
+            
+            # Validate new date is not in the past
+            if new_date < datetime.now().date():
+                flash('Cannot schedule appointments in the past', 'danger')
+                return redirect(url_for('student.dashboard'))
+            
+            # Calculate end time (1 hour duration)
+            new_end_time = (datetime.combine(datetime.min, new_time) + timedelta(hours=1)).time()
+            
+            # Check counselor availability
+            day_of_week = new_date.strftime('%A')
+            counselor_schedule = CounsellorSchedule.query.filter_by(
+                counsellor_id=appointment.counselor_id,
+                day_of_week=day_of_week
+            ).first()
+            
+            if not counselor_schedule:
+                flash('Counselor is not available on this day.', 'danger')
+                return redirect(url_for('student.dashboard'))
+            
+            if (new_time < counselor_schedule.start_time or 
+                new_end_time > counselor_schedule.end_time):
+                flash('Selected time is outside counselor\'s working hours.', 'danger')
+                return redirect(url_for('student.dashboard'))
+            
+            # Check for existing appointments at the new time
+            existing_appointment = Appointment.query.filter_by(
+                counselor_id=appointment.counselor_id,
+                appointment_date=new_date,
+                start_time=new_time,
+                status='scheduled'
+            ).first()
+            
+            if existing_appointment and existing_appointment.id != appointment_id:
+                flash('This time slot is already booked. Please choose another time.', 'danger')
+                return redirect(url_for('student.dashboard'))
+            
+            # Update appointment
+            appointment.appointment_date = new_date
+            appointment.start_time = new_time
+            appointment.end_time = new_end_time
+            appointment.status = 'rescheduled'
+            
+            # Create notifications
+            student_notification = Notification(
+                user_id=current_user.id,
+                message=f'Your appointment has been rescheduled to {new_date.strftime("%B %d, %Y")} at {new_time.strftime("%I:%M %p")}',
+                notification_type='appointment',
+                related_entity_id=appointment.id
+            )
+            
+            counselor_notification = Notification(
+                user_id=appointment.counselor_id,
+                message=f'Appointment with {current_user.first_name} {current_user.last_name} has been rescheduled to {new_date.strftime("%B %d, %Y")} at {new_time.strftime("%I:%M %p")}',
+                notification_type='appointment',
+                related_entity_id=appointment.id
+            )
+            
+            db.session.add(student_notification)
+            db.session.add(counselor_notification)
+            db.session.commit()
+            
+            flash('Appointment rescheduled successfully!', 'success')
+            return redirect(url_for('student.dashboard'))
+            
+        except ValueError as e:
+            flash('Invalid date or time format.', 'danger')
+        except Exception as e:
+            db.session.rollback()
+            flash('Failed to reschedule appointment. Please try again.', 'danger')
+        
+        return redirect(url_for('student.dashboard'))
+    
+    return render_template('student/reschedule_appointment.html', 
+                         appointment=appointment,
+                         today=datetime.now())
+
+@student_bp.route('/student/appointment_requests/<int:request_id>/cancel', methods=['POST'])
+@login_required
+def cancel_appointment_request(request_id):
+    print(f"\n=== Debug: Canceling Appointment Request {request_id} ===")
+    try:
+        # Find the appointment request
+        appointment_request = AppointmentRequest.query.filter_by(
+            id=request_id,
+            student_id=current_user.id,
+            status='pending'
+        ).first()
+
+        if not appointment_request:
+            print("Error: Appointment request not found or not pending")
+            return jsonify({
+                'status': 'error',
+                'message': 'Appointment request not found or already processed'
+            }), 404
+        
+        print(f"Found appointment request: {appointment_request.id}")
+        print(f"Current status: {appointment_request.status}")
+        
+        # Update the request status
+        appointment_request.status = 'cancelled'
+        
+        # Create notification for counselor
+        counselor_notification = Notification(
+            user_id=appointment_request.counselor_id,
+            message=f'Appointment request for {appointment_request.preferred_date.strftime("%B %d, %Y")} at {appointment_request.preferred_time.strftime("%I:%M %p")} has been cancelled by the student.',
+            notification_type='appointment',
+            related_entity_id=appointment_request.id,
+            created_at=datetime.now()
+        )
+        db.session.add(counselor_notification)
+        
+        # Create notification for student
+        student_notification = Notification(
+            user_id=current_user.id,
+            message=f'You have cancelled your appointment request for {appointment_request.preferred_date.strftime("%B %d, %Y")} at {appointment_request.preferred_time.strftime("%I:%M %p")}.',
+            notification_type='appointment',
+            related_entity_id=appointment_request.id,
+            created_at=datetime.now()
+        )
+        db.session.add(student_notification)
+        
+        print("Committing changes to database...")
+        db.session.commit()
+        print("Successfully cancelled appointment request")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Appointment request cancelled successfully'
+        })
+        
+    except Exception as e:
+        print(f"Error cancelling appointment request: {str(e)}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to cancel appointment request. Please try again.'
+        }), 500

@@ -103,24 +103,13 @@ function deleteGoal(goalId) {
         })
         .then(response => {
             if (response.ok) {
-                // Remove goal item from UI
-                const goalItem = document.querySelector(`.goal-item[data-goal-id="${goalId}"]`);
-                goalItem.remove();
-                
                 // Show success message
                 showToast('Goal deleted successfully', 'success');
                 
-                // If no goals left, show empty state
-                const goalList = document.querySelector('.goal-list');
-                if (!goalList.querySelector('.goal-item')) {
-                    goalList.innerHTML = `
-                        <div class="text-center py-4">
-                            <i class="fas fa-flag fa-3x text-muted mb-3"></i>
-                            <h5>No career goals yet</h5>
-                            <p class="text-muted">Click "Add Goal" to get started!</p>
-                        </div>
-                    `;
-                }
+                // Refresh the page after a short delay
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
             } else {
                 throw new Error('Failed to delete goal');
             }
@@ -130,6 +119,46 @@ function deleteGoal(goalId) {
             showToast('Failed to delete goal', 'error');
         });
     }
+}
+
+function addGoal(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+
+    // Add loading state
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalText = submitButton.innerHTML;
+    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...';
+    submitButton.disabled = true;
+
+    fetch(form.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to add goal');
+        }
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addGoalModal'));
+        modal.hide();
+        
+        // Reset form
+        form.reset();
+        
+        // Refresh the page to show new goal
+        window.location.reload();
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Failed to add goal. Please try again.', 'error');
+    })
+    .finally(() => {
+        // Reset button state
+        submitButton.innerHTML = originalText;
+        submitButton.disabled = false;
+    });
 }
 
 // Helper Functions

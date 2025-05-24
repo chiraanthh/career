@@ -177,9 +177,9 @@ class Notification(db.Model):
     notification_id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('student.id', ondelete='CASCADE'))
     message = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     read_status = db.Column(db.Boolean, default=False)
-    notification_type = db.Column(db.Enum('general', 'appointment', 'resource', 'payment', 'grievance'), nullable=False)
+    notification_type = db.Column(db.Enum('general', 'appointment', 'resource', 'payment', 'grievance', 'appointment_request'), nullable=False)
     related_entity_id = db.Column(db.Integer)
 
     def to_dict(self):
@@ -188,7 +188,7 @@ class Notification(db.Model):
             'message': self.message,
             'type': self.notification_type,
             'read': self.read_status,
-            'created_at': self.created_at.isoformat(),
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),  # Format as string with local time
             'related_entity_id': self.related_entity_id
         }
 
@@ -277,4 +277,37 @@ class Task(db.Model):
             'status': self.status,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
+        }
+
+class AppointmentRequest(db.Model):
+    __tablename__ = 'appointment_requests'
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('student.id', ondelete='CASCADE'), nullable=False)
+    counselor_id = db.Column(db.Integer, db.ForeignKey('career_counselors.id', ondelete='CASCADE'), nullable=False)
+    appointment_type = db.Column(db.String(100), nullable=False)
+    preferred_date = db.Column(db.Date, nullable=False)
+    preferred_time = db.Column(db.Time, nullable=False)
+    mode = db.Column(db.Enum('online', 'offline', 'phone'), nullable=False)
+    notes = db.Column(db.Text)
+    status = db.Column(db.Enum('pending', 'approved', 'rejected'), default='pending')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    student = db.relationship('Student', backref=db.backref('appointment_requests', lazy=True))
+    counselor = db.relationship('CareerCounselor', backref=db.backref('appointment_requests', lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'student_id': self.student_id,
+            'counselor_id': self.counselor_id,
+            'appointment_type': self.appointment_type,
+            'preferred_date': self.preferred_date,
+            'preferred_time': self.preferred_time,
+            'mode': self.mode,
+            'notes': self.notes,
+            'status': self.status,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at
         }

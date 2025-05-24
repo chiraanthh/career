@@ -83,6 +83,21 @@ CREATE TABLE counselor_assignment_logs (
     FOREIGN KEY (assigned_by_id) REFERENCES administrators(id)
 );
 
+CREATE TABLE appointment_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id INTEGER NOT NULL,
+    counselor_id INTEGER NOT NULL,
+    appointment_type VARCHAR(100) NOT NULL,
+    preferred_date DATE NOT NULL,
+    preferred_time TIME NOT NULL,
+    mode VARCHAR(10) NOT NULL CHECK (mode IN ('online', 'offline', 'phone')),
+    notes TEXT,
+    status VARCHAR(10) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES student(id) ON DELETE CASCADE,
+    FOREIGN KEY (counselor_id) REFERENCES career_counselors(id) ON DELETE CASCADE
+);
 -- Appointments
 CREATE TABLE appointments (
     id INT AUTO_INCREMENT PRIMARY KEY,
