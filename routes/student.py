@@ -27,92 +27,152 @@ def assign_counselor(student_interests):
     # Convert student interests to a list and clean them
     interests = [interest.strip().lower() for interest in student_interests.split(',')]
     
-    # Find best matching counselor
+    # Find best matching counselor based on specialization
     best_match_score = 0
     selected_counselor = None
     
+    # Define specialization categories and related keywords
+    specialization_keywords = {
+        'Technology': ['technology', 'computer', 'it', 'software', 'programming', 'tech'],
+        'Healthcare': ['healthcare', 'medical', 'medicine', 'health', 'nursing'],
+        'Business': ['business', 'finance', 'management', 'entrepreneurship', 'marketing'],
+        'Engineering': ['engineering', 'mechanical', 'civil', 'electrical', 'electronics'],
+        'Arts': ['arts', 'creative', 'design', 'music', 'fine arts', 'media'],
+        'Science': ['science', 'physics', 'chemistry', 'biology', 'research'],
+        'Education': ['education', 'teaching', 'training', 'academic'],
+        'Law': ['law', 'legal', 'justice', 'advocacy']
+    }
+    
     for counselor in available_counselors:
-        # Split counselor specialization into keywords
-        specializations = [spec.strip().lower() for spec in counselor.specialization.split(',')]
+        match_score = 0
+        counselor_specialization = counselor.specialization.lower()
         
-        # Calculate match score based on overlapping interests/specializations
-        match_score = sum(1 for interest in interests 
-                         for spec in specializations 
-                         if interest in spec or spec in interest)
+        # Check each student interest against counselor's specialization and related keywords
+        for interest in interests:
+            # Direct match with specialization
+            if interest in counselor_specialization:
+                match_score += 2  # Give higher weight to direct matches
+                continue
+            
+            # Check against specialization keywords
+            for spec, keywords in specialization_keywords.items():
+                if spec.lower() == counselor_specialization:
+                    if any(keyword in interest for keyword in keywords):
+                        match_score += 1
+                        break
         
         # Update best match if this counselor has a better score
         if match_score > best_match_score:
             best_match_score = match_score
             selected_counselor = counselor
     
-    # If no matches found, just pick the first available counselor
+    # If no matches found, assign the counselor with highest rating
     if not selected_counselor and available_counselors:
-        selected_counselor = available_counselors[0]
+        selected_counselor = max(available_counselors, key=lambda c: c.rating)
     
     return selected_counselor.id if selected_counselor else None
 
 @student_bp.route('/student/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        first_name = request.form.get('first_name')
-        last_name = request.form.get('last_name')
-        email = request.form.get('email')
-        phone = request.form.get('phone')
-        dob = datetime.strptime(request.form.get('dob'), '%Y-%m-%d').date()
-        address = request.form.get('address')
-        education_level = request.form.get('education_level')
-        interests = ','.join(request.form.getlist('interests'))
-        password = request.form.get('password')
-
-        # Check if email already exists
-        if Student.query.filter_by(email=email).first():
-            flash('Email already registered', 'danger')
-            return render_template('student/register.html')
-
-        # Assign a counselor based on interests
-        counselor_id = assign_counselor(interests)
-
-        # Create new student
-        student = Student(
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            phone=phone,
-            dob=dob,
-            address=address,
-            education_level=education_level,
-            interests=interests,
-            counselor_id=counselor_id,
-            is_active=True
-        )
-        student.set_password(password)
-
         try:
+            # Get form data with debug prints
+            print("Starting registration process...")
+            first_name = request.form.get('first_name')
+            last_name = request.form.get('last_name')
+            email = request.form.get('email')
+            phone = request.form.get('phone')
+            dob_str = request.form.get('dob')
+            address = request.form.get('address')
+            education_level = request.form.get('education_level')
+            interests = request.form.getlist('interests')
+            password = request.form.get('password')
+
+            print(f"Received data: {first_name=}, {last_name=}, {email=}, {interests=}")
+
+            # Validate required fields
+            if not all([first_name, last_name, email, password, dob_str]):
+                flash('Please fill in all required fields', 'danger')
+                return render_template('student/register.html')
+
+            # Parse date of birth
+            try:
+                dob = datetime.strptime(dob_str, '%Y-%m-%d').date()
+            except ValueError as e:
+                print(f"DOB parsing error: {e}")
+                flash('Invalid date format for date of birth', 'danger')
+                return render_template('student/register.html')
+
+            # Check if email already exists
+            existing_student = Student.query.filter_by(email=email).first()
+            if existing_student:
+                flash('Email already registered', 'danger')
+                return render_template('student/register.html')
+
+            # Convert interests list to comma-separated string
+            interests_str = ','.join(interests) if interests else ''
+            print(f"Interests string: {interests_str}")
+            
+            # Assign a counselor based on interests
+            counselor_id = assign_counselor(interests_str)
+            print(f"Assigned counselor ID: {counselor_id}")
+
+            # Create new student
+            student = Student(
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                phone=phone,
+                dob=dob,
+                address=address,
+                education_level=education_level,
+                interests=interests_str,
+                counselor_id=counselor_id,
+                is_active=True
+            )
+            
+            # Set password
+            student.set_password(password)
+            print("Student object created, attempting database save...")
+
+            # Add to database
             db.session.add(student)
-            
-            # Create notification for the assigned counselor if one was assigned
-            if counselor_id:
-                notification = Notification(
-                    user_id=f"counsellor-{counselor_id}",
-                    message=f"New student {first_name} {last_name} has been assigned to you based on matching interests.",
-                    notification_type='assignment',
-                    related_entity_id=student.id
-                )
-                db.session.add(notification)
-            
             db.session.commit()
-            
+            print(f"Student saved to database with ID: {student.id}")
+
+            # Create notification for assigned counselor
             if counselor_id:
+                try:
+                    notification = Notification(
+                        user_id=counselor_id,  # Changed from f"counselor-{counselor_id}"
+                        message=f"New student {first_name} {last_name} has been assigned to you based on matching interests.",
+                        notification_type='assignment',
+                        related_entity_id=student.id
+                    )
+                    db.session.add(notification)
+                    db.session.commit()
+                    print("Counselor notification created")
+                except Exception as notif_error:
+                    print(f"Notification creation error: {notif_error}")
+                    # Continue even if notification fails
+                    pass
+
                 flash('Registration successful! A counselor matching your interests has been assigned to you.', 'success')
             else:
                 flash('Registration successful! A counselor will be assigned to you soon.', 'success')
-                
+
             return redirect(url_for('auth.login'))
+
         except Exception as e:
             db.session.rollback()
-            flash('An error occurred during registration', 'danger')
+            print(f"Registration error: {str(e)}")
+            print(f"Error type: {type(e)}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            flash('An error occurred during registration. Please try again.', 'danger')
             return render_template('student/register.html')
 
+    # GET request - show registration form
     return render_template('student/register.html')
 
 @student_bp.route('/goals', methods=['GET', 'POST'])
@@ -569,7 +629,11 @@ def submit_grievance():
 @student_bp.route('/student/request_appointment', methods=['POST'])
 @login_required
 def request_appointment():
-    if not current_user.counselor_id:
+    # Get student ID from current_user
+    student_id = int(current_user.get_id().split('-')[1])
+    counselor_id = current_user.counselor_id
+    
+    if not counselor_id:
         flash('You need to be assigned a counselor first.', 'danger')
         return redirect(url_for('student.dashboard'))
     
@@ -579,10 +643,20 @@ def request_appointment():
     mode = request.form.get('mode')
     notes = request.form.get('notes')
     
+    # Validate required fields
+    if not all([appointment_type, appointment_date, start_time, mode]):
+        flash('Please fill in all required fields', 'danger')
+        return redirect(url_for('student.dashboard'))
+    
     try:
         # Convert string inputs to proper datetime objects
         appointment_date = datetime.strptime(appointment_date, '%Y-%m-%d').date()
         start_time = datetime.strptime(start_time, '%H:%M').time()
+        
+        # Validate appointment date is not in the past
+        if appointment_date < datetime.now().date():
+            flash('Cannot schedule appointments in the past', 'danger')
+            return redirect(url_for('student.dashboard'))
         
         # Calculate end time (1 hour duration)
         end_time = (datetime.combine(datetime.min, start_time) + timedelta(hours=1)).time()
@@ -590,7 +664,7 @@ def request_appointment():
         # Check if counselor is available at this time
         day_of_week = appointment_date.strftime('%A')
         counselor_schedule = CounsellorSchedule.query.filter_by(
-            counsellor_id=current_user.counselor_id,
+            counsellor_id=counselor_id,
             day_of_week=day_of_week
         ).first()
         
@@ -605,7 +679,7 @@ def request_appointment():
         
         # Check for existing appointments at the same time
         existing_appointment = Appointment.query.filter_by(
-            counselor_id=current_user.counselor_id,
+            counselor_id=counselor_id,
             appointment_date=appointment_date,
             start_time=start_time
         ).first()
@@ -616,8 +690,8 @@ def request_appointment():
         
         # Create new appointment
         appointment = Appointment(
-            student_id=current_user.id,
-            counselor_id=current_user.counselor_id,
+            student_id=student_id,
+            counselor_id=counselor_id,
             appointment_date=appointment_date,
             start_time=start_time,
             end_time=end_time,
@@ -627,19 +701,28 @@ def request_appointment():
         )
         
         if mode == 'online':
-            # Generate a unique meeting link (you can replace this with your actual video conferencing logic)
+            # Generate a unique meeting link
             appointment.meeting_link = f"meet.counseling.com/{uuid.uuid4().hex}"
         
         db.session.add(appointment)
         
         # Create notification for both student and counselor
         student_notification = Notification(
-            user_id=current_user.id,
+            user_id=student_id,
             message=f'Your {appointment_type} appointment has been scheduled for {appointment_date.strftime("%B %d, %Y")} at {start_time.strftime("%I:%M %p")}',
             notification_type='appointment',
             related_entity_id=appointment.id
         )
         db.session.add(student_notification)
+        
+        # Create notification for counselor
+        counselor_notification = Notification(
+            user_id=counselor_id,
+            message=f'New {appointment_type} appointment scheduled with {current_user.first_name} {current_user.last_name} for {appointment_date.strftime("%B %d, %Y")} at {start_time.strftime("%I:%M %p")}',
+            notification_type='appointment',
+            related_entity_id=appointment.id
+        )
+        db.session.add(counselor_notification)
         
         db.session.commit()
         flash('Appointment scheduled successfully!', 'success')
@@ -676,11 +759,6 @@ def dashboard():
         GoalMilestone.status == 'pending'
     ).order_by(GoalMilestone.due_date.asc()).limit(5).all()
     
-    # Get student documents
-    student_documents = StudentDocument.query.filter_by(
-        student_id=current_user.id
-    ).order_by(StudentDocument.upload_date.desc()).all()
-    
     # Get recent grievances
     recent_grievances = Grievance.query.filter_by(
         student_id=current_user.id
@@ -713,7 +791,6 @@ def dashboard():
                          unread_notifications=unread_notifications,
                          career_goals=career_goals,
                          upcoming_milestones=upcoming_milestones,
-                         student_documents=student_documents,
                          recent_grievances=recent_grievances,
                          upcoming_appointments=upcoming_appointments,
                          upcoming_events=upcoming_events,

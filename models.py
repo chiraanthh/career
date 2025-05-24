@@ -16,13 +16,13 @@ class CareerCounselor(db.Model, UserMixin):
     qualification = db.Column(db.Text)
     years_of_experience = db.Column(db.Integer)
     bio = db.Column(db.Text)
-    availability_status = db.Column(db.Boolean)
+    availability_status = db.Column(db.Boolean, default=True)
     rating = db.Column(db.Numeric(3, 2))
     date_registered = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
 
     def get_id(self):
-        return f"counsellor-{self.id}"
+        return f"counselor-{self.id}"
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -49,7 +49,7 @@ class Student(db.Model, UserMixin):
     date_registered = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
 
-    counselor = db.relationship('CareerCounselor', backref='students', foreign_keys=[counselor_id])
+    counselor = db.relationship('CareerCounselor', backref=db.backref('students', lazy=True), foreign_keys=[counselor_id])
 
     def get_id(self):
         return f"student-{self.id}"

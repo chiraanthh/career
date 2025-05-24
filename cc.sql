@@ -149,16 +149,6 @@ CREATE TABLE career_resources (
     FOREIGN KEY (added_by) REFERENCES administrators(id)
 );
 
-CREATE TABLE student_documents (
-    document_id INT AUTO_INCREMENT PRIMARY KEY,
-    student_id INT,
-    title VARCHAR(255) NOT NULL,
-    file_path VARCHAR(255) NOT NULL,
-    document_type ENUM('transcript', 'resume', 'certificate', 'other') NOT NULL,
-    upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (student_id) REFERENCES student(id) ON DELETE CASCADE
-);
-
 CREATE TABLE notifications (
     notification_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
@@ -241,3 +231,15 @@ CREATE TABLE event_registrations (
     FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
     FOREIGN KEY (student_id) REFERENCES student(id) ON DELETE CASCADE
 );
+INSERT INTO career_counselors (
+    first_name, last_name, email, password_hash, specialization, qualification,
+    years_of_experience, bio, availability_status, rating, date_registered
+) VALUES
+('John', 'Doe', 'john.doe@example.com', 'password123', 'Technology', 'MSc Computer Science', 10, 'Experienced technology counselor.', TRUE, 4.5, NOW()),
+('Jane', 'Smith', 'jane.smith@example.com', 'password123', 'Healthcare', 'MD Medicine', 8, 'Healthcare career counselor.', TRUE, 4.6, NOW()),
+('Michael', 'Brown', 'michael.brown@example.com', 'password123', 'Business', 'MBA Finance', 12, 'Business and finance counselor.', TRUE, 4.9, NOW()),
+('Aisha', 'Patel', 'aisha.patel@example.com', 'password123', 'Engineering', 'BTech Mechanical Engineering', 7, 'Engineering career advisor.', TRUE, 4.7, NOW()),
+('Padmavathi', 'Devarakonda', 'padma.devarakonda@example.com', 'password123', 'Arts', 'MA Fine Arts', 15, 'Arts and creative careers expert.', TRUE, 4.8, NOW()),
+('Ahmed', 'Khan', 'ahmed.khan@example.com', 'password123', 'Science', 'PhD Physics', 11, 'Science and research specialist.', TRUE, 4.8, NOW()),
+('Rachel', 'Lee', 'rachel.lee@example.com', 'password123', 'Education', 'M.Ed.', 9, 'Education and teaching counselor.', TRUE, 4.4, NOW()),
+('Bharati', 'Trivedi', 'bharati.trivedi@example.com', 'password123', 'Law', 'LLM Law', 20, 'Legal careers and law expert.', TRUE, 4.7, NOW());

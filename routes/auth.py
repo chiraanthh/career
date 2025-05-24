@@ -1,9 +1,11 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required
-from werkzeug.security import check_password_hash
 from models import Student, CareerCounselor, Administrator
+from datetime import datetime
+from flask_sqlalchemy import SQLAlchemy
 
 auth_bp = Blueprint('auth', __name__)
+db = SQLAlchemy()
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -25,9 +27,12 @@ def login():
 
         if user is None:
             flash('No account found with that email.', 'danger')
-        elif not check_password_hash(user.password_hash, password):
+        elif not user.check_password(password):
             flash('Incorrect password.', 'danger')
         else:
+            user.last_login = datetime.utcnow()
+            db.session.commit()
+            
             login_user(user)
             if user_type == 'student':
                 return redirect(url_for('student.dashboard'))

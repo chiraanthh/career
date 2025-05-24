@@ -285,16 +285,7 @@
                     <div class="counselor-info">
                         <h6>{{ student.counselor.first_name }} {{ student.counselor.last_name }}</h6>
                         <p class="text-muted">{{ student.counselor.specialization }}</p>
-                        <div class="counselor-actions mt-3">
-                            <button onclick="(function() { window.location.href='{{ url_for('student.book_appointment') }}'; })()" 
-                                    class="btn btn-primary btn-sm">
-                                Book Appointment
-                            </button>
-                            <button onclick="(function() { window.location.href='{{ url_for('student.messages') }}'; })()" 
-                                    class="btn btn-outline-primary btn-sm">
-                                Send Message
-                            </button>
-                        </div>
+                      
                     </div>
                     {% else %}
                     <p class="text-muted">No counselor assigned yet</p>
@@ -345,44 +336,6 @@
                         </div>
                         {% else %}
                         <p class="text-muted">No upcoming appointments</p>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Documents -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Documents</h5>
-                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#documentModal">
-                        <i class="fas fa-upload"></i> Upload
-                    </button>
-                </div>
-                <div class="card-body">
-                    <div class="document-list">
-                        {% for doc in student_documents %}
-                        <div class="document-item">
-                            <div class="document-info">
-                                <i class="fas {% if doc.file_type == 'pdf' %}fa-file-pdf{% elif doc.file_type in ['doc', 'docx'] %}fa-file-word{% elif doc.file_type in ['jpg', 'png', 'jpeg'] %}fa-file-image{% else %}fa-file{% endif %}"></i>
-                                <span>{{ doc.title }}</span>
-                            </div>
-                            <div class="document-meta">
-                                <span class="badge bg-secondary">{{ doc.document_type }}</span>
-                                <small class="text-muted">{{ doc.upload_date.strftime('%Y-%m-%d') }}</small>
-                            </div>
-                            <div class="document-actions">
-                                <a href="{{ url_for('student.download_document', doc_id=doc.id) }}" 
-                                   class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-download"></i> Download
-                                </a>
-                                <button onclick="deleteDocument({{ doc.id }})" 
-                                        class="btn btn-sm btn-outline-danger">
-                                    <i class="fas fa-trash"></i> Delete
-                                </button>
-                            </div>
-                        </div>
-                        {% else %}
-                        <p class="text-muted">No documents uploaded</p>
                         {% endfor %}
                     </div>
                 </div>
@@ -489,43 +442,6 @@
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
             </form>
-        </div>
-    </div>
-</div>
-
-<!-- Document Upload Modal -->
-<div class="modal fade" id="documentModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Upload Document</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="documentForm" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label class="form-label">Title</label>
-                        <input type="text" class="form-control" name="title" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Document Type</label>
-                        <select class="form-select" name="document_type" required>
-                            <option value="transcript">Transcript</option>
-                            <option value="resume">Resume</option>
-                            <option value="certificate">Certificate</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">File</label>
-                        <input type="file" class="form-control" name="file" required>
-                    </div>
-                    <div class="text-end">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Upload</button>
-                    </div>
-                </form>
-            </div>
         </div>
     </div>
 </div>
@@ -775,155 +691,7 @@ function cancelAppointment(appointmentId) {
 }
 
 function rescheduleAppointment(appointmentId) {
-    // Store the appointment ID and show the appointment modal
-    document.getElementById('appointmentForm').dataset.rescheduleId = appointmentId;
-    $('#appointmentModal').modal('show');
-}
-
-// Handle appointment form submission
-document.getElementById('appointmentForm').addEventListener('submit', function(event) {
-    event.preventDefault();
-    
-    const formData = new FormData(this);
-    const rescheduleId = this.dataset.rescheduleId;
-    const endpoint = rescheduleId 
-        ? `/student/appointments/${rescheduleId}/reschedule`
-        : '/student/appointments/request';
-    
-    fetch(endpoint, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.reload();
-        } else {
-            alert('Failed to submit appointment request: ' + data.message);
-        }
-    })
-    .catch(error => console.error('Error:', error));
-});
-
-// Reset the form when the modal is closed
-$('#appointmentModal').on('hidden.bs.modal', function() {
-    document.getElementById('appointmentForm').reset();
-    delete document.getElementById('appointmentForm').dataset.rescheduleId;
-});
-
-document.getElementById('documentForm').addEventListener('submit', function(event) {
-    event.preventDefault();
-    
-    const formData = new FormData(this);
-    const progressBar = document.querySelector('.upload-progress .progress-bar');
-    const progressContainer = document.querySelector('.upload-progress');
-    const percentageText = document.querySelector('.upload-percentage');
-    
-    progressContainer.style.display = 'block';
-    
-    fetch('/student/documents/upload', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Add the new document to the list without reloading
-            const documentList = document.querySelector('.document-list');
-            const noDocsMessage = documentList.querySelector('.text-muted');
-            if (noDocsMessage) {
-                noDocsMessage.remove();
-            }
-            
-            const newDoc = document.createElement('div');
-            newDoc.className = 'document-item';
-            newDoc.dataset.docId = data.document.id;
-            newDoc.innerHTML = `
-                <div class="document-info">
-                    <i class="fas ${getFileIcon(data.document.file_type)}"></i>
-                    <span>${data.document.title}</span>
-                </div>
-                <div class="document-meta">
-                    <span class="badge bg-secondary">${data.document.document_type}</span>
-                    <small class="text-muted">${data.document.upload_date}</small>
-                </div>
-                <div class="document-actions">
-                    <a href="/student/documents/${data.document.id}/download" 
-                       class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-download"></i> Download
-                    </a>
-                    <button onclick="deleteDocument(${data.document.id})" 
-                            class="btn btn-sm btn-outline-danger">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
-                </div>
-            `;
-            
-            documentList.insertBefore(newDoc, documentList.firstChild);
-            $('#documentModal').modal('hide');
-            this.reset();
-            
-            // Show success message
-            showToast('Document uploaded successfully', 'success');
-        } else {
-            showToast('Failed to upload document: ' + data.message, 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showToast('Failed to upload document. Please try again.', 'error');
-    })
-    .finally(() => {
-        progressContainer.style.display = 'none';
-        progressBar.style.width = '0%';
-        percentageText.textContent = '0%';
-    });
-});
-
-function deleteDocument(docId) {
-    if (!confirm('Are you sure you want to delete this document?')) {
-        return;
-    }
-    
-    fetch(`/student/documents/${docId}/delete`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const docElement = document.querySelector(`[data-doc-id="${docId}"]`);
-            if (docElement) {
-                docElement.remove();
-                
-                // Show "No documents" message if list is empty
-                const documentList = document.querySelector('.document-list');
-                if (!documentList.children.length) {
-                    documentList.innerHTML = '<p class="text-muted">No documents uploaded</p>';
-                }
-                
-                showToast('Document deleted successfully', 'success');
-            }
-        } else {
-            showToast('Failed to delete document: ' + data.message, 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showToast('Failed to delete document. Please try again.', 'error');
-    });
-}
-
-function getFileIcon(fileType) {
-    const icons = {
-        'pdf': 'fa-file-pdf',
-        'doc': 'fa-file-word',
-        'image': 'fa-file-image',
-        'other': 'fa-file'
-    };
-    return icons[fileType] || 'fa-file';
+    window.location.href = `/student/appointments/${appointmentId}/reschedule`;
 }
 
 function showToast(message, type = 'info') {
