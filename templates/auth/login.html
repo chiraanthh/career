@@ -21,8 +21,8 @@
       <a href="/" style="color: inherit; text-decoration: none;">CareerConnect</a>
     </div>
     <nav>
-      <a href="{{ url_for('auth.login') }}" class="btn btn-active">Login</a>
-      <a href="{{ url_for('student.register') }}" class="btn">Register</a>
+      <a href="/">Home</a>
+        
     </nav>
   </header>
 
@@ -41,13 +41,7 @@
           <label for="password">Password</label>
           <input type="password" id="password" name="password" placeholder="Enter your password" required>
         </div>
-        <div class="form-options">
-          <div class="checkbox">
-            <input type="checkbox" id="remember" name="remember">
-            <label for="remember">Remember me</label>
-          </div>
-          <a href="/forgot-password" class="forgot-link">Forgot password?</a>
-        </div>
+        
         <button type="submit" class="btn btn-primary btn-block">Sign In</button>
       </form>
       

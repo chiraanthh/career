@@ -1,6 +1,6 @@
 from flask import Flask, render_template
 from flask_login import LoginManager
-from models import db, Student, CareerCounselor, Administrator
+from models import db, Student, CareerCounsellor, Administrator
 from config import Config
 from routes import register_blueprints
 from routes.auth import auth_bp
@@ -26,12 +26,13 @@ def load_user(user_id):
     if not id.isdigit():
         return None
     id = int(id)
+    
     if user_type == 'student':
-        return Student.query.get(id)
+        return db.session.get(Student, id)
     elif user_type == 'counsellor':
-        return CareerCounselor.query.get(id)
+        return db.session.get(CareerCounsellor, id)
     elif user_type == 'admin':
-        return Administrator.query.get(id)
+        return db.session.get(Administrator, id)
     return None
 
 @app.route('/')
@@ -39,4 +40,4 @@ def index():
     return render_template('index.html')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True,host='0.0.0.0',port=5001)

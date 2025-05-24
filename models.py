@@ -5,8 +5,8 @@ from datetime import datetime, date, time
 
 db = SQLAlchemy()
 
-class CareerCounselor(db.Model, UserMixin):
-    __tablename__ = 'career_counselors'
+class CareerCounsellor(db.Model, UserMixin):
+    __tablename__ = 'counsellors'
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
@@ -22,7 +22,7 @@ class CareerCounselor(db.Model, UserMixin):
     last_login = db.Column(db.DateTime)
 
     def get_id(self):
-        return f"counselor-{self.id}"
+        return f"counsellor-{self.id}"
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -42,14 +42,14 @@ class Student(db.Model, UserMixin):
     address = db.Column(db.Text)
     education_level = db.Column(db.String(100))
     interests = db.Column(db.Text)
-    counselor_id = db.Column(db.Integer, db.ForeignKey('career_counselors.id', ondelete='SET NULL'))
+    counsellor_id = db.Column(db.Integer, db.ForeignKey('counsellors.id', ondelete='SET NULL'))
     course = db.Column(db.String(100))
     quiz_result = db.Column(db.String(100))
     is_active = db.Column(db.Boolean, default=True)
     date_registered = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
 
-    counselor = db.relationship('CareerCounselor', backref=db.backref('students', lazy=True), foreign_keys=[counselor_id])
+    counsellor = db.relationship('CareerCounsellor', backref=db.backref('students', lazy=True), foreign_keys=[counsellor_id])
 
     def get_id(self):
         return f"student-{self.id}"
@@ -72,6 +72,11 @@ class Administrator(db.Model, UserMixin):
     is_active = db.Column(db.Boolean, default=True)
     date_registered = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
+    
+    @staticmethod
+    def is_admin_email(email):
+        """Check if an email belongs to an administrator"""
+        return Administrator.query.filter_by(email=email).first() is not None
 
     def get_id(self):
         return f"admin-{self.id}"
@@ -95,12 +100,12 @@ class Grievance(db.Model):
 
     student = db.relationship('Student', backref='grievances', foreign_keys=[student_id])
 
-class CounselorAssignmentLog(db.Model):
-    __tablename__ = 'counselor_assignment_logs'
+class CounsellorAssignmentLog(db.Model):
+    __tablename__ = 'counsellor_assignment_logs'
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('student.id', ondelete='CASCADE'), nullable=False)
-    old_counselor_id = db.Column(db.Integer, db.ForeignKey('career_counselors.id', ondelete='SET NULL'))
-    new_counselor_id = db.Column(db.Integer, db.ForeignKey('career_counselors.id', ondelete='CASCADE'), nullable=False)
+    old_counsellor_id = db.Column(db.Integer, db.ForeignKey('counsellors.id', ondelete='SET NULL'))
+    new_counsellor_id = db.Column(db.Integer, db.ForeignKey('counsellors.id', ondelete='CASCADE'), nullable=False)
     reason = db.Column(db.Text)
     assigned_by_id = db.Column(db.Integer, db.ForeignKey('administrators.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -109,7 +114,7 @@ class Appointment(db.Model):
     __tablename__ = 'appointments'
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('student.id', ondelete='CASCADE'), nullable=False)
-    counselor_id = db.Column(db.Integer, db.ForeignKey('career_counselors.id', ondelete='CASCADE'), nullable=False)
+    counsellor_id = db.Column(db.Integer, db.ForeignKey('counsellors.id', ondelete='CASCADE'), nullable=False)
     appointment_date = db.Column(db.Date, nullable=False)
     start_time = db.Column(db.Time, nullable=False)
     end_time = db.Column(db.Time)
@@ -117,9 +122,30 @@ class Appointment(db.Model):
     mode = db.Column(db.Enum('online', 'offline', 'phone'), nullable=False)
     meeting_link = db.Column(db.String(255))
     location = db.Column(db.String(255))
-    is_free = db.Column(db.Boolean, default=False)
-    fee = db.Column(db.Numeric(10,2))
+    is_free = db.Column(db.Boolean, default=True)
+    fee = db.Column(db.Numeric(10,2), default=0)
     payment_status = db.Column(db.Enum('paid', 'pending', 'not_required'), default='not_required')
+
+    # Relationships
+    student = db.relationship('Student', backref=db.backref('appointments', lazy=True))
+    counsellor = db.relationship('CareerCounsellor', backref=db.backref('appointments', lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'student_id': self.student_id,
+            'counsellor_id': self.counsellor_id,
+            'appointment_date': self.appointment_date,
+            'start_time': self.start_time,
+            'end_time': self.end_time,
+            'status': self.status,
+            'mode': self.mode,
+            'meeting_link': self.meeting_link,
+            'location': self.location,
+            'is_free': self.is_free,
+            'fee': float(self.fee) if self.fee else None,
+            'payment_status': self.payment_status
+        }
 
 class CounsellingSession(db.Model):
     __tablename__ = 'counselling_sessions'
@@ -136,7 +162,7 @@ class Feedback(db.Model):
     feedback_id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(db.Integer, db.ForeignKey('counselling_sessions.session_id'))
     student_id = db.Column(db.Integer, db.ForeignKey('student.id'))
-    counsellor_id = db.Column(db.Integer, db.ForeignKey('career_counselors.id'))
+    counsellor_id = db.Column(db.Integer, db.ForeignKey('counsellors.id'))
     rating = db.Column(db.Integer)
     comments = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -144,7 +170,7 @@ class Feedback(db.Model):
 class CounsellorSchedule(db.Model):
     __tablename__ = 'counsellor_schedules'
     schedule_id = db.Column(db.Integer, primary_key=True)
-    counsellor_id = db.Column(db.Integer, db.ForeignKey('career_counselors.id', ondelete='CASCADE'))
+    counsellor_id = db.Column(db.Integer, db.ForeignKey('counsellors.id', ondelete='CASCADE'))
     day_of_week = db.Column(db.Enum('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'))
     start_time = db.Column(db.Time)
     end_time = db.Column(db.Time)
@@ -188,7 +214,7 @@ class Notification(db.Model):
             'message': self.message,
             'type': self.notification_type,
             'read': self.read_status,
-            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),  # Format as string with local time
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'related_entity_id': self.related_entity_id
         }
 
@@ -232,7 +258,7 @@ class Event(db.Model):
     title = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text)
     event_type = db.Column(db.Enum('webinar', 'workshop', 'qna', 'seminar'), nullable=False)
-    counsellor_id = db.Column(db.Integer, db.ForeignKey('career_counselors.id'))
+    counsellor_id = db.Column(db.Integer, db.ForeignKey('counsellors.id'))
     event_date = db.Column(db.Date, nullable=False)
     start_time = db.Column(db.Time, nullable=False)
     end_time = db.Column(db.Time)
@@ -283,7 +309,7 @@ class AppointmentRequest(db.Model):
     __tablename__ = 'appointment_requests'
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('student.id', ondelete='CASCADE'), nullable=False)
-    counselor_id = db.Column(db.Integer, db.ForeignKey('career_counselors.id', ondelete='CASCADE'), nullable=False)
+    counsellor_id = db.Column(db.Integer, db.ForeignKey('counsellors.id', ondelete='CASCADE'), nullable=False)
     appointment_type = db.Column(db.String(100), nullable=False)
     preferred_date = db.Column(db.Date, nullable=False)
     preferred_time = db.Column(db.Time, nullable=False)
@@ -295,13 +321,13 @@ class AppointmentRequest(db.Model):
 
     # Relationships
     student = db.relationship('Student', backref=db.backref('appointment_requests', lazy=True))
-    counselor = db.relationship('CareerCounselor', backref=db.backref('appointment_requests', lazy=True))
+    counsellor = db.relationship('CareerCounsellor', backref=db.backref('appointment_requests', lazy=True))
 
     def to_dict(self):
         return {
             'id': self.id,
             'student_id': self.student_id,
-            'counselor_id': self.counselor_id,
+            'counsellor_id': self.counsellor_id,
             'appointment_type': self.appointment_type,
             'preferred_date': self.preferred_date,
             'preferred_time': self.preferred_time,

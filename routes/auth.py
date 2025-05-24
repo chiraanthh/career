@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required
-from models import Student, CareerCounselor, Administrator
+from models import Student, CareerCounsellor, Administrator
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 
@@ -13,17 +13,25 @@ def login():
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
 
-        # Try to find user in each type of user table
+        # Check if it's the admin email
+        if Administrator.is_admin_email(email):
+            user = Administrator.query.filter_by(email=email).first()
+            if user and user.check_password(password):
+                login_user(user)
+                user.last_login = datetime.utcnow()
+                db.session.commit()
+                return redirect(url_for('admin.dashboard'))
+            else:
+                flash('Invalid admin credentials.', 'danger')
+                return render_template('auth/login.html')
+
+        # Try to find user in student or counsellor tables
         user = Student.query.filter_by(email=email).first()
         user_type = 'student'
         
         if not user:
-            user = CareerCounselor.query.filter_by(email=email).first()
+            user = CareerCounsellor.query.filter_by(email=email).first()
             user_type = 'counsellor'
-            
-        if not user:
-            user = Administrator.query.filter_by(email=email).first()
-            user_type = 'admin'
 
         if user is None:
             flash('No account found with that email.', 'danger')
@@ -37,9 +45,7 @@ def login():
             if user_type == 'student':
                 return redirect(url_for('student.dashboard'))
             elif user_type == 'counsellor':
-                return redirect(url_for('counselor.dashboard'))
-            elif user_type == 'admin':
-                return redirect(url_for('admin.dashboard'))
+                return redirect(url_for('counsellor.dashboard'))
 
     return render_template('auth/login.html')
 

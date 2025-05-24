@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-from models import db, Student, CareerCounselor, Administrator
+from models import db, Student, CareerCounsellor, Administrator
 from werkzeug.security import check_password_hash
 from config import Config  # Import your Config class
 
@@ -23,7 +23,7 @@ def load_user(user_id):
     if user_type == 'student':
         return Student.query.get(id)
     elif user_type == 'counsellor':
-        return CareerCounselor.query.get(id)
+        return CareerCounsellor.query.get(id)
     elif user_type == 'admin':
         return Administrator.query.get(id)
     return None
@@ -43,7 +43,7 @@ def student_login():
         if user_type == 'student':
             user = Student.query.filter_by(email=email).first()
         elif user_type == 'counsellor':
-            user = CareerCounselor.query.filter_by(email=email).first()
+            user = CareerCounsellor.query.filter_by(email=email).first()
         elif user_type == 'admin':
             user = Administrator.query.filter_by(email=email).first()
 

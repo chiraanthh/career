@@ -7,7 +7,7 @@
     function calculateResult(event) {
       event.preventDefault();
       const answers = ['q1', 'q2', 'q3'].map(q => {
-        const selected = document.querySelector(input[name="${q}"]:checked);
+        const selected = document.querySelector(`input[name="${q}"]:checked`);
         return selected ? selected.value : null;
       });
 
@@ -266,7 +266,7 @@
     <div class="logo">CareerConnect</div>
     <nav>
       <a href="/about" class="btn">About Us</a>
-      <a href="/events" class="btn">Upcoming Events</a>
+      <a href="{{ url_for('main.events') }}" class="btn">Upcoming Events</a>
       
       <span class="btn" style="background-color: transparent; color: var(--primary-color); font-weight: bold; cursor: default;" >
         📞 24/7 Support: +91-9876543210

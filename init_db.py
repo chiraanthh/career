@@ -1,14 +1,14 @@
 from app import app
-from models import db, CareerCounselor
+from models import db, CareerCounsellor, Administrator
 from datetime import datetime
 
 
 def initialize_counsellors():
     for c in initial_counsellors:
-        existing = CareerCounselor.query.filter_by(email=c['email']).first()
+        existing = CareerCounsellor.query.filter_by(email=c['email']).first()
         if existing:
             continue
-        counsellor = CareerCounselor(
+        counsellor = CareerCounsellor(
             first_name=c['first_name'],
             last_name=c['last_name'],
             email=c['email'],
@@ -24,6 +24,22 @@ def initialize_counsellors():
         db.session.add(counsellor)
     db.session.commit()
 
+def init_db():
+    db.create_all()
+    
+    # Create admin account if it doesn't exist
+    admin_email = Administrator.ADMIN_EMAIL
+    if not Administrator.query.filter_by(email=admin_email).first():
+        admin = Administrator(
+            email=admin_email,
+            first_name='Admin',
+            last_name='User'
+        )
+        admin.set_password('admin123')  # Default password, should be changed after first login
+        db.session.add(admin)
+        db.session.commit()
+        print("Admin account created successfully!")
+
 initial_counsellors = [
     {
         'first_name': 'John',
@@ -33,7 +49,7 @@ initial_counsellors = [
         'specialization': 'Technology & Engineering',
         'qualification': 'MSc Computer Science',
         'years_of_experience': 10,
-        'bio': 'Experienced technology counselor.',
+        'bio': 'Experienced technology counsellor.',
         'availability_status': True,
         'rating': 4.5
     },
@@ -57,7 +73,7 @@ initial_counsellors = [
         'specialization': 'Healthcare & Medicine',
         'qualification': 'MD Medicine',
         'years_of_experience': 8,
-        'bio': 'Healthcare career counselor.',
+        'bio': 'Healthcare career counsellor.',
         'availability_status': True,
         'rating': 4.6
     },
@@ -81,7 +97,7 @@ initial_counsellors = [
         'specialization': 'Business & Finance',
         'qualification': 'MBA Finance',
         'years_of_experience': 12,
-        'bio': 'Business and finance counselor.',
+        'bio': 'Business and finance counsellor.',
         'availability_status': True,
         'rating': 4.9
     },
@@ -103,4 +119,5 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
         initialize_counsellors()
-        print("Database tables created and counselors initialized!")
+        init_db()
+        print("Database tables created and counsellors initialized!")
