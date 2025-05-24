@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - CareerConnect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="navbar">
+        <div class="logo">
+            <a href="/" style="color: inherit; text-decoration: none;">CareerConnect</a>
+        </div>
+        <nav>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-active">Dashboard</a>
+            <a href="{{ url_for('auth.logout') }}" class="btn">Logout</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div class="dashboard-container">
+            <h1>Welcome, {{ admin.first_name }}!</h1>
+            <p>Manage the CareerConnect platform and its users here.</p>
+
+            <div class="dashboard-section">
+                <div class="card">
+                    <h3>User Statistics</h3>
+                    <p>Total Students: <span class="count">0</span></p>
+                    <p>Total Counsellors: <span class="count">0</span></p>
+                    <p>Active Sessions: <span class="count">0</span></p>
+                    <a href="#" class="btn">View Details</a>
+                </div>
+
+                <div class="card">
+                    <h3>Counsellor Management</h3>
+                    <p>Pending Approvals: <span class="count">0</span></p>
+                    <a href="#" class="btn">Review Applications</a>
+                    <a href="#" class="btn btn-secondary">Manage Counsellors</a>
+                </div>
+
+                <div class="card">
+                    <h3>Resource Management</h3>
+                    <p>Total Resources: <span class="count">0</span></p>
+                    <a href="#" class="btn">Add Resource</a>
+                    <a href="#" class="btn btn-secondary">View All</a>
+                </div>
+
+                <div class="card">
+                    <h3>System Reports</h3>
+                    <p>New Reports: <span class="count">0</span></p>
+                    <a href="#" class="btn">Generate Report</a>
+                    <a href="#" class="btn btn-secondary">View Analytics</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-links">
+                    <a href="/about">About Us</a>
+                    <a href="/contact">Contact</a>
+                    <a href="/privacy">Privacy Policy</a>
+                    <a href="/terms">Terms of Service</a>
+                </div>
+                <p>&copy; 2025 CareerConnect. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html> 

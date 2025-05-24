@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Counsellor Dashboard - CareerConnect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="navbar">
+        <div class="logo">
+            <a href="/" style="color: inherit; text-decoration: none;">CareerConnect</a>
+        </div>
+        <nav>
+            <a href="{{ url_for('counsellor.dashboard') }}" class="btn btn-active">Dashboard</a>
+            <a href="{{ url_for('auth.logout') }}" class="btn">Logout</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div class="dashboard-container">
+            <h1>Welcome, {{ counsellor.first_name }}!</h1>
+            <p>Manage your counselling sessions and student interactions here.</p>
+
+            <div class="dashboard-section">
+                <div class="card">
+                    <h3>Profile Overview</h3>
+                    <p>Name: {{ counsellor.first_name }} {{ counsellor.last_name }}</p>
+                    <p>Email: {{ counsellor.email }}</p>
+                    <p>Specialization: {{ counsellor.specialization }}</p>
+                    <p>Experience: {{ counsellor.years_of_experience }} years</p>
+                    <a href="#" class="btn">Edit Profile</a>
+                </div>
+
+                <div class="card">
+                    <h3>Today's Sessions</h3>
+                    <p class="count">0</p>
+                    <p>Upcoming Sessions</p>
+                    <a href="#" class="btn">View Schedule</a>
+                    <a href="#" class="btn btn-secondary">Session History</a>
+                </div>
+
+                <div class="card">
+                    <h3>My Students</h3>
+                    <p class="count">{{ counsellor.students|length }}</p>
+                    <p>Assigned Students</p>
+                    <a href="#" class="btn">View Students</a>
+                </div>
+
+                <div class="card">
+                    <h3>Resources</h3>
+                    <p class="count">0</p>
+                    <p>Shared Resources</p>
+                    <a href="#" class="btn">Manage Resources</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-links">
+                    <a href="/about">About Us</a>
+                    <a href="/contact">Contact</a>
+                    <a href="/privacy">Privacy Policy</a>
+                    <a href="/terms">Terms of Service</a>
+                </div>
+                <p>&copy; 2025 CareerConnect. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html> 
